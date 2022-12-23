@@ -13,9 +13,10 @@ from dora.log import fatal
 import torch as th
 import torchaudio as ta
 
-from .apply import apply_model, BagOfModels
-from .audio import AudioFile, convert_audio, save_audio
-from .pretrained import get_model_from_args, add_model_flags, ModelLoadingError
+from demucs.apply import apply_model, BagOfModels
+from demucs.audio import AudioFile, convert_audio, save_audio
+from demucs.pretrained import get_model_from_args, add_model_flags
+from demucs.repo import ModelLoadingError
 
 
 def load_track(track, audio_channels, samplerate):

@@ -12,8 +12,8 @@ import typing as tp
 
 from dora.log import fatal
 
-from .hdemucs import HDemucs
-from .repo import RemoteRepo, LocalRepo, ModelOnlyRepo, BagOnlyRepo, AnyModelRepo, ModelLoadingError  # noqa
+from demucs.hdemucs import HDemucs
+from demucs.repo import AnyModelRepo, BagOnlyRepo, LocalRepo, ModelOnlyRepo, RemoteRepo
 
 logger = logging.getLogger(__name__)
 ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"

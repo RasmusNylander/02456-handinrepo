@@ -16,12 +16,12 @@ from torch.nn import functional as F
 from fractions import Fraction
 from einops import rearrange
 
-from .transformer import CrossTransformerEncoder
+from demucs.transformer import CrossTransformerEncoder
 
-from .demucs import rescale_module
-from .states import capture_init
-from .spec import spectro, ispectro
-from .hdemucs import pad1d, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+from demucs.demucs import rescale_module
+from demucs.states import capture_init
+from demucs.spec import ispectro, spectro
+from demucs.hdemucs import HDecLayer, HEncLayer, MultiWrap, ScaledEmbedding, pad1d
 
 
 class HTDemucs(nn.Module):

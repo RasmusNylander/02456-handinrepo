@@ -18,14 +18,14 @@ from omegaconf import OmegaConf
 import torch
 from torch.utils.data import ConcatDataset
 
-from . import distrib
-from .wav import get_wav_datasets, get_musdb_wav_datasets
-from .demucs import Demucs
-from .hdemucs import HDemucs
-from .htdemucs import HTDemucs
-from .repitch import RepitchedWrapper
-from .solver import Solver
-from .utils import random_subset
+from demucs import distrib
+from demucs.wav import get_wav_datasets
+from demucs.demucs import Demucs
+from demucs.hdemucs import HDemucs
+from demucs.htdemucs import HTDemucs
+from demucs.solver import Solver
+from demucs.utils import random_subset
+from demucs.speech import get_librimix_wav_datasets
 
 logger = logging.getLogger(__name__)
 

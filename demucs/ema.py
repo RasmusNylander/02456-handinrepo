@@ -9,7 +9,7 @@ from contextlib import contextmanager
 
 import torch
 
-from .states import swap_state
+from demucs.states import swap_state
 
 
 class ModelEMA:

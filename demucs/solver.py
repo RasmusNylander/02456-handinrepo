@@ -13,12 +13,12 @@ from dora.log import LogProgress, bold
 import torch
 import torch.nn.functional as F
 
-from . import augment, distrib, states, pretrained
-from .apply import apply_model
-from .ema import ModelEMA
-from .evaluate import evaluate, new_sdr
-from .svd import svd_penalty
-from .utils import pull_metric, EMA
+from demucs import augment, distrib, pretrained, states
+from demucs.apply import apply_model
+from demucs.ema import ModelEMA
+from demucs.evaluate import evaluate_speech, new_sdr
+from demucs.svd import svd_penalty
+from demucs.utils import pull_metric, EMA
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +276,7 @@ class Solver(object):
                 compute_sdr = self.args.test.sdr and is_last
                 with states.swap_state(self.model, state):
                     with torch.no_grad():
-                        metrics['test'] = evaluate(self, compute_sdr=compute_sdr)
+                        metrics['test'] = evaluate_speech(self.model, self.args.dset.samplerate, self.args.dset.segment, self.args.dset.channels, self.args.misc.num_prints, self.args.test.workers, None)
                 formatted = self._format_test(metrics['test'])
                 logger.info(bold(f"Test Summary | Epoch {epoch + 1} | {_summary(formatted)}"))
             self.link.push_metrics(metrics)

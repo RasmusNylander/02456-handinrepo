@@ -15,9 +15,8 @@ import typing as tp
 import torch
 import yaml
 
-from .apply import BagOfModels, Model
-from .states import load_model
-
+from demucs.apply import BagOfModels, Model
+from demucs.states import load_model
 
 AnyModel = tp.Union[Model, BagOfModels]
 

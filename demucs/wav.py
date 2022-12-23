@@ -20,8 +20,8 @@ from torch import distributed
 import torchaudio as ta
 from torch.nn import functional as F
 
-from .audio import convert_audio_channels
-from . import distrib
+from demucs.audio import convert_audio_channels
+from demucs import distrib
 
 MIXTURE = "mixture"
 EXT = ".wav"

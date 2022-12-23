@@ -11,6 +11,12 @@ be reported as `nsdr` for `new sdr`).
 
 from concurrent import futures
 import logging
+from pathlib import Path
+from typing import Optional
+
+import torch
+from numpy import ndarray
+from torch import Tensor
 
 from dora.log import LogProgress
 import numpy as np
@@ -18,10 +24,11 @@ import musdb
 import museval
 import torch as th
 
-from .apply import apply_model
-from .audio import convert_audio, save_audio
-from . import distrib
-from .utils import DummyPoolExecutor
+from demucs.apply import apply_model
+from demucs.audio import save_audio
+from demucs import distrib
+from demucs.utils import DummyPoolExecutor
+from demucs.speech import get_librimix_wav_testset
 
 
 logger = logging.getLogger(__name__)

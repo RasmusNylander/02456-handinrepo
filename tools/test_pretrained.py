@@ -30,12 +30,18 @@ def main():
     with xp.enter():
         solver = train.get_solver(xp.cfg)
 
-    model = pretrained.get_model_from_args(args)
+    model = pretrained.get_model("0d19c1c6")
+    # model = pretrained.get_model("97d170e1")
+    # model = pretrained.get_model_from_args(args)
     solver.model = model.to(solver.device)
     solver.model.eval()
 
     with torch.no_grad():
-        results = evaluate.evaluate(solver, xp.cfg.test.sdr)
+        # results = evaluate.evaluate_speech(model, 8000, 15, model.audio_channels, solver.args.misc.num_prints, solver.args.test.workers, Path("D:/teppi/separatedOur"))
+        # results = evaluate.evaluate_speech(model, 8000, 15, model.audio_channels, solver.args.misc.num_prints, solver.args.test.workers, Path("D:/teppi/separated"))
+        results = evaluate.evaluate_speech(model, 8000, 15, model.audio_channels, solver.args.misc.num_prints, solver.args.test.workers, None)
+
+
     print(results)
 
 
