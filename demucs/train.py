@@ -16,7 +16,6 @@ import hydra
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 import torch
-from torch.utils.data import ConcatDataset
 
 from demucs import distrib
 from demucs.wav import get_wav_datasets
@@ -129,15 +128,20 @@ def get_solver(args, model_only=False) -> Solver:
     logger.info("train/valid set size: %d %d", len(train_set), len(valid_set))
     train_loader = distrib.loader(
         train_set, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.misc.num_workers, drop_last=True)
+        num_workers=args.misc.num_workers, drop_last=True,
+        persistent_workers=True, prefetch_factor=32)
+
     if args.dset.full_cv:
         valid_loader = distrib.loader(
             valid_set, batch_size=1, shuffle=False,
-            num_workers=args.misc.num_workers)
+            num_workers=args.misc.num_workers,
+            persistent_workers=True, prefetch_factor=32)
     else:
         valid_loader = distrib.loader(
             valid_set, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.misc.num_workers, drop_last=True)
+            num_workers=args.misc.num_workers, drop_last=True,
+            persistent_workers=True, prefetch_factor=32)
+
     loaders = {"train": train_loader, "valid": valid_loader}
 
     # Construct Solver
