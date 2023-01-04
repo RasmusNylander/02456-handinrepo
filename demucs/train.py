@@ -30,19 +30,19 @@ from demucs.speech import get_librimix_wav_datasets
 logger = logging.getLogger(__name__)
 
 
-def get_model(args):
+def get_model(sources: list[str], channels: int, samplerate: int, segment_length: int, model_name: str, args):
     extra = {
-        'sources': list(args.dset.sources),
-        'audio_channels': args.dset.channels,
-        'samplerate': args.dset.samplerate,
-        'segment': args.model_segment or 4 * args.dset.segment,
+        'sources': sources,
+        'audio_channels': channels,
+        'samplerate': samplerate,
+        'segment': segment_length,
     }
     klass = {
         'demucs': Demucs,
         'hdemucs': HDemucs,
         'htdemucs': HTDemucs,
-    }[args.model]
-    kw = OmegaConf.to_container(getattr(args, args.model), resolve=True)
+    }[model_name]
+    kw = OmegaConf.to_container(getattr(args, model_name), resolve=True)
     model = klass(**extra, **kw)
     return model
 
@@ -120,7 +120,8 @@ def get_solver(args, model_only=False) -> Solver:
     distrib.init()
 
     torch.manual_seed(args.seed)
-    model = get_model(args)
+    segment_length = args.model_segment or 4 * args.dset.segment
+    model = get_model(list(args.dset.sources), args.dset.channels, args.dset.samplerate, segment_length, args.model, args)
     if args.misc.show:
         logger.info(model)
         mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
