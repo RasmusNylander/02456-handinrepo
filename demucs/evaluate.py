@@ -20,7 +20,6 @@ from torch import Tensor
 
 from dora.log import LogProgress
 import numpy as np
-import musdb
 import museval
 import torch as th
 
@@ -71,111 +70,98 @@ def eval_track(references: ndarray, estimates: ndarray, win: int, hop: int) -> t
     return sdr, isr, sir, sar
 
 
-def evaluate(solver, compute_sdr=False):
+def evaluate_speech(model, samplerate: int, segment_length: int, audio_channels: int, number_of_prints: int, number_of_workers: Optional[int], save_separated_wavs_path: Optional[Path]) -> dict[str, float]:
     """
-    Evaluate model using museval.
-    compute_sdr=False means using only the MDX definition of the SDR, which
-    is much faster to evaluate.
+    Evaluate the model on the speech dataset.
     """
 
-    args = solver.args
+    # audio_sources = model.sources
+    audio_sources = ["noise", "human"]
 
-    output_dir = solver.folder / "results"
-    output_dir.mkdir(exist_ok=True, parents=True)
-    json_folder = solver.folder / "results/test"
-    json_folder.mkdir(exist_ok=True, parents=True)
+    test_set_root = Path("/work3/projects/02456/project04/librimix/Libri2Mix/wav16k/max/test")
 
-    # we load tracks from the original musdb set
-    if args.test.nonhq is None:
-        test_set = musdb.DB(args.dset.musdb, subsets=["test"], is_wav=True)
-    else:
-        test_set = musdb.DB(args.test.nonhq, subsets=["test"], is_wav=False)
-    src_rate = args.dset.musdb_samplerate
+    test_set = get_librimix_wav_testset(test_set_root, samplerate, segment_length, audio_channels)
 
-    eval_device = 'cpu'
+    eval_device = 'cuda'
 
-    model = solver.model
-    win = int(1. * model.samplerate)
-    hop = int(1. * model.samplerate)
+    batch_size = 20
+    indicies = range(distrib.rank * batch_size, len(test_set), distrib.world_size * batch_size)
 
-    indexes = range(distrib.rank, len(test_set), distrib.world_size)
-    indexes = LogProgress(logger, indexes, updates=args.misc.num_prints,
-                          name='Eval')
+    indicies = LogProgress(logger, indicies, updates=number_of_prints, name='Eval')
+
     pendings = []
 
-    pool = futures.ProcessPoolExecutor if args.test.workers else DummyPoolExecutor
-    with pool(args.test.workers) as pool:
-        for index in indexes:
-            track = test_set.tracks[index]
+    # pool = futures.ProcessPoolExecutor if number_of_workers else DummyPoolExecutor
+    # with pool(number_of_workers) as pool:
+    for index in indicies:
+        tracks: Tensor = th.stack([test_set[i].cuda() for i in range(index, index + batch_size) if i < len(test_set)], 0)
+        mix: Tensor = tracks[:, 0, ...]
+        sources: Tensor = tracks[:, 1:, ...]
+        estimates: Tensor = apply_model(model, mix, device=eval_device)[:, 2:4]
 
-            mix = th.from_numpy(track.audio).t().float()
-            if mix.dim() == 1:
-                mix = mix[None]
-            mix = mix.to(solver.device)
-            ref = mix.mean(dim=0)  # mono mixture
-            mix = (mix - ref.mean()) / ref.std()
-            mix = convert_audio(mix, src_rate, model.samplerate, model.audio_channels)
-            estimates = apply_model(model, mix[None],
-                                    shifts=args.test.shifts, split=args.test.split,
-                                    overlap=args.test.overlap)[0]
-            estimates = estimates * ref.std() + ref.mean()
-            estimates = estimates.to(eval_device)
+        if save_separated_wavs_path is not None:
+            track_names = test_set.track_names[index:(index + batch_size)]
+            save_directory = save_separated_wavs_path / "wav"
+            save_batched_estimates(["mixture"] + audio_sources, torch.cat((mix.unsqueeze(1), estimates), 1), samplerate, save_directory, track_names)
 
-            references = th.stack(
-                [th.from_numpy(track.targets[name].audio).t() for name in model.sources])
-            if references.dim() == 2:
-                references = references[:, None]
-            references = references.to(eval_device)
-            references = convert_audio(references, src_rate,
-                                       model.samplerate, model.audio_channels)
-            if args.test.save:
-                folder = solver.folder / "wav" / track.name
-                folder.mkdir(exist_ok=True, parents=True)
-                for name, estimate in zip(model.sources, estimates):
-                    save_audio(estimate.cpu(), folder / (name + ".mp3"), model.samplerate)
 
-            pendings.append((track.name, pool.submit(
-                eval_track, references, estimates, win=win, hop=hop, compute_sdr=compute_sdr)))
+        # pendings.append((test_set.metadata[index].name, pool.submit(eval_track, sources, estimates)))
+        # for track_estimate, track_sources in zip(estimates, sources):
+        #     pendings.append((test_set.metadata[index].name, pool.submit(eval_track_old, track_sources, track_estimate, int(2.0 * samplerate), int(1.5 * samplerate))))
+        # pendings.append((test_set.metadata[index].name, pool.submit(eval_track_old, sources.detach().cpu(), estimates.detach().cpu(), int(4.0 * samplerate), int(2.5 * samplerate))))
+        sources = sources.transpose(2, 3)
+        estimates = estimates.transpose(2, 3)
+        pendings.append((str(index), eval_track(sources.detach().cpu().numpy(), estimates.detach().cpu().numpy(), int(4.0 * samplerate), int(2.5 * samplerate))))
 
-        pendings = LogProgress(logger, pendings, updates=args.misc.num_prints,
-                               name='Eval (BSS)')
-        tracks = {}
-        for track_name, pending in pendings:
-            pending = pending.result()
-            scores, nsdrs = pending
-            tracks[track_name] = {}
-            for idx, target in enumerate(model.sources):
-                tracks[track_name][target] = {'nsdr': [float(nsdrs[idx])]}
-            if scores is not None:
-                (sdr, isr, sir, sar) = scores
-                for idx, target in enumerate(model.sources):
-                    values = {
-                        "SDR": sdr[idx].tolist(),
-                        "SIR": sir[idx].tolist(),
-                        "ISR": isr[idx].tolist(),
-                        "SAR": sar[idx].tolist()
-                    }
-                    tracks[track_name][target].update(values)
+    # pendings = LogProgress(logger, pendings, updates=number_of_prints, name='Eval (BSS)')
 
-        all_tracks = {}
-        for src in range(distrib.world_size):
-            all_tracks.update(distrib.share(tracks, src))
+    print("About to start evaluating")
+    #------------
+    track_results: dict[str, dict[str, dict[str, ndarray]]] = {}
+    for batch_id, evaluation in pendings:
+        evaluation_result: tuple[ndarray, ndarray, ndarray, ndarray] = evaluation
+        sdr, isr, sir, sar = evaluation_result
+        sdr[sdr == float('-inf')] = float('nan'); sdr[sdr == float('inf')] = float('nan')
+        isr[isr == float('-inf')] = float('nan'); isr[isr == float('inf')] = float('nan')
+        sir[sir == float('-inf')] = float('nan'); sir[sir == float('inf')] = float('nan')
+        sar[sar == float('-inf')] = float('nan'); sar[sar == float('inf')] = float('nan')
+        for batch_component in range(sdr.shape[0]):
+            track_results[batch_id + str(batch_component)] = {}
+            for idx, target in enumerate(audio_sources):
+                track_results[batch_id + str(batch_component)][target] = {
+                    "SDR": sdr[batch_component][idx],
+                    "SIR": sir[batch_component][idx],
+                    "ISR": isr[batch_component][idx],
+                    "SAR": sar[batch_component][idx]
+                }
 
-        result = {}
-        metric_names = next(iter(all_tracks.values()))[model.sources[0]]
-        for metric_name in metric_names:
-            avg = 0
-            avg_of_medians = 0
-            for source in model.sources:
-                medians = [
-                    np.nanmedian(all_tracks[track][source][metric_name])
-                    for track in all_tracks.keys()]
-                mean = np.mean(medians)
-                median = np.median(medians)
-                result[metric_name.lower() + "_" + source] = mean
-                result[metric_name.lower() + "_med" + "_" + source] = median
-                avg += mean / len(model.sources)
-                avg_of_medians += median / len(model.sources)
-            result[metric_name.lower()] = avg
-            result[metric_name.lower() + "_med"] = avg_of_medians
-        return result
+    all_tracks: dict = {}
+    for src in range(distrib.world_size):
+        all_tracks.update(distrib.share(track_results, src))
+
+    result: dict[str, float] = {}
+    metric_names = next(iter(all_tracks.values()))[audio_sources[0]]
+    for metric_name in metric_names:
+        avg = 0
+        avg_of_medians = 0
+        for source in audio_sources:
+            medians = [
+                np.nanmedian(all_tracks[track][source][metric_name])
+                for track in all_tracks.keys()]
+            mean = np.mean(medians)
+            median = np.median(medians)
+            result[metric_name.lower() + "_" + source] = mean
+            result[metric_name.lower() + "_med" + "_" + source] = median
+            avg += mean / len(audio_sources)
+            avg_of_medians += median / len(audio_sources)
+        result[metric_name.lower()] = avg
+        result[metric_name.lower() + "_med"] = avg_of_medians
+    return result
+
+
+def save_batched_estimates(audio_sources: list[str], estimates: Tensor, samplerate: int, save_directory: Path, track_names: list[str]) -> None:
+    for name, track_estimate in zip(track_names, estimates):
+        track_folder = save_directory / name
+        track_folder.mkdir(exist_ok=True, parents=True)
+        for audio_source, estimate in zip(audio_sources, track_estimate):
+            save_audio(estimate, track_folder / (audio_source + ".wav"), samplerate)
