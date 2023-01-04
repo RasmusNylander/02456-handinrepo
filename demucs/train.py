@@ -167,10 +167,10 @@ def get_solver_from_sig(sig, model_only=False):
 def main(args):
     global __file__
     __file__ = hydra.utils.to_absolute_path(__file__)
-    for attr in ["musdb", "wav", "metadata"]:
-        val = getattr(args.dset, attr)
-        if val is not None:
-            setattr(args.dset, attr, hydra.utils.to_absolute_path(val))
+    # for attr in ["metadata"]:
+    #     val = getattr(args.dset, attr)
+    #     if val is not None:
+    #         setattr(args.dset, attr, hydra.utils.to_absolute_path(val))
 
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
@@ -183,6 +183,10 @@ def main(args):
     from dora import get_xp
     logger.debug(get_xp().cfg)
 
+    args.dset.segment = 15
+    args.batch_size = 32
+    args.dset.samplerate = 8000
+    args.dset.root = "/work3/projects/02456/project04/librimix/Libri2Mix/wav16k/max/train-360/"
     solver = get_solver(args)
     solver.train()
 
