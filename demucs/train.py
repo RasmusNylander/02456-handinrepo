@@ -116,7 +116,7 @@ def get_datasets(args):
     return train_set, valid_set
 
 
-def get_solver(args, model_only=False):
+def get_solver(args, model_only=False) -> Solver:
     distrib.init()
 
     torch.manual_seed(args.seed)
