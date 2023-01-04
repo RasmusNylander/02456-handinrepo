@@ -34,7 +34,7 @@ from demucs.speech import get_librimix_wav_testset
 logger = logging.getLogger(__name__)
 
 
-def new_sdr(references, estimates):
+def new_sdr(references: Tensor, estimates: Tensor) -> Tensor:
     """
     Compute the SDR according to the MDX challenge definition.
     Adapted from AIcrowd/music-demixing-challenge-starter-kit (MIT license)
