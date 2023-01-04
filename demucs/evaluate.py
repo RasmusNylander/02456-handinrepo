@@ -41,12 +41,12 @@ def new_sdr(references: Tensor, estimates: Tensor) -> Tensor:
     """
     assert references.dim() == 4
     assert estimates.dim() == 4
-    delta = 1e-7  # avoid numerical errors
-    num = th.sum(th.square(references), dim=(2, 3))
-    den = th.sum(th.square(references - estimates), dim=(2, 3))
-    num += delta
-    den += delta
-    scores = 10 * th.log10(num / den)
+    delta: float = 1e-7  # avoid numerical errors
+    numerator: Tensor = th.sum(th.square(references), dim=(2, 3))
+    denominator: Tensor = th.sum(th.square(references - estimates), dim=(2, 3))
+    numerator += delta
+    denominator += delta
+    scores = 10 * th.log10(numerator / denominator)
     return scores
 
 
