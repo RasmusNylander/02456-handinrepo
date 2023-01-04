@@ -81,38 +81,10 @@ def get_optimizer(model, args):
         raise ValueError("Invalid optimizer %s", args.optim.optimizer)
 
 
-def get_datasets(args):
-    train_set, valid_set = get_musdb_wav_datasets(args.dset)
-    if args.dset.wav:
-        extra_train_set, extra_valid_set = get_wav_datasets(args.dset)
-        if len(args.dset.sources) <= 4:
-            train_set = ConcatDataset([train_set, extra_train_set])
-            valid_set = ConcatDataset([valid_set, extra_valid_set])
-        else:
-            train_set = extra_train_set
-            valid_set = extra_valid_set
-
-    if args.dset.wav2:
-        extra_train_set, extra_valid_set = get_wav_datasets(args.dset, "wav2")
-        weight = args.dset.wav2_weight
-        if weight is not None:
-            b = len(train_set)
-            e = len(extra_train_set)
-            reps = max(1, round(e / b * (1 / weight - 1)))
-        else:
-            reps = 1
-        train_set = ConcatDataset([train_set] * reps + [extra_train_set])
-        if args.dset.wav2_valid:
-            if weight is not None:
-                b = len(valid_set)
-                n_kept = int(round(weight * b / (1 - weight)))
-                valid_set = ConcatDataset(
-                    [valid_set, random_subset(extra_valid_set, n_kept)]
-                )
-            else:
-                valid_set = ConcatDataset([valid_set, extra_valid_set])
-    if args.dset.valid_samples is not None:
-        valid_set = random_subset(valid_set, args.dset.valid_samples)
+def get_datasets(args_dset, train_data_root: Path, sources: list[str], samplerate: int, segment_length: int, audio_channels: int):
+    train_set, valid_set = get_librimix_wav_datasets(train_data_root, sources=sources, samplerate=samplerate, segment=segment_length, audio_channels=audio_channels)
+    if args_dset.valid_samples is not None:
+        valid_set = random_subset(valid_set, args_dset.valid_samples)
     return train_set, valid_set
 
 
@@ -144,16 +116,15 @@ def get_solver(args, model_only=False) -> Solver:
     if model_only:
         return Solver(None, model, optimizer, args)
 
-    train_set, valid_set = get_datasets(args)
-
-    if args.augment.repitch.proba:
-        vocals = []
-        if 'vocals' in args.dset.sources:
-            vocals.append(args.dset.sources.index('vocals'))
-        else:
-            logger.warning('No vocal source found')
-        if args.augment.repitch.proba:
-            train_set = RepitchedWrapper(train_set, vocals=vocals, **args.augment.repitch)
+    train_set, valid_set = get_datasets(args.dset, Path(args.dset.root), args.dset.sources, args.dset.samplerate, args.dset.segment, args.dset.channels)
+    # if args.augment.repitch.proba:
+    #     vocals = []
+    #     if 'vocals' in args.dset.sources:
+    #         vocals.append(args.dset.sources.index('vocals'))
+    #     else:
+    #         logger.warning('No vocal source found')
+    #     if args.augment.repitch.proba:
+    #         train_set = RepitchedWrapper(train_set, vocals=vocals, **args.augment.repitch)
 
     logger.info("train/valid set size: %d %d", len(train_set), len(valid_set))
     train_loader = distrib.loader(
