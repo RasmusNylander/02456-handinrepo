@@ -50,25 +50,25 @@ def new_sdr(references: Tensor, estimates: Tensor) -> Tensor:
     return scores
 
 
-def eval_track(references, estimates, win, hop, compute_sdr=True):
-    references = references.transpose(1, 2).double()
-    estimates = estimates.transpose(1, 2).double()
+def eval_track(references: ndarray, estimates: ndarray, win: int, hop: int) -> tuple[ndarray, ndarray, ndarray, ndarray]:
+    num_windows = (references.shape[2] - win + hop) // hop
 
-    new_scores = new_sdr(references.cpu()[None], estimates.cpu()[None])[0]
+    # references = references.transpose((2, -1))
+    # estimates = estimates.transpose((-2, -1))
 
-    if not compute_sdr:
-        return None, new_scores
-    else:
-        references = references.numpy()
-        estimates = estimates.numpy()
-        scores = museval.metrics.bss_eval(
-            references, estimates,
+    sdr = np.empty((references.shape[0], references.shape[1], num_windows))
+    isr = np.empty((references.shape[0], references.shape[1], num_windows))
+    sir = np.empty((references.shape[0], references.shape[1], num_windows))
+    sar = np.empty((references.shape[0], references.shape[1], num_windows))
+    for i, (track_estimate, track_sources) in enumerate(zip(estimates, references)):
+        sdr[i], isr[i], sir[i], sar[i], _ = museval.metrics.bss_eval(
+            track_sources, track_estimate,
             compute_permutation=False,
             window=win,
             hop=hop,
             framewise_filters=False,
-            bsseval_sources_version=False)[:-1]
-        return scores, new_scores
+            bsseval_sources_version=False)
+    return sdr, isr, sir, sar
 
 
 def evaluate(solver, compute_sdr=False):
