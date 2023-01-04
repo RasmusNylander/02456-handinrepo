@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - dset: musdb44
+  - dset: speech
   - svd: default
   - variant: default
   - override hydra/hydra_logging: colorlog
@@ -8,19 +8,18 @@ defaults:
 
 dummy:
 dset:
-  musdb: /checkpoint/defossez/datasets/musdbhq
-  musdb_samplerate: 44100
-  wav:  # path to custom wav dataset
-  wav2:  # second custom wav dataset
-  segment: 11
+  segment: 7
   shift: 1
   train_valid: false
   full_cv: true
-  samplerate: 44100
-  channels: 2
+  samplerate: 1000
+  channels: 1
   normalize: true
+  librimix_samplerate: 16000
+  librimix_num_speakers: 1
+  root: D:/teppi/test
   metadata: ./metadata
-  sources: ['drums', 'bass', 'other', 'vocals']
+  sources: ['human', 'noise']
   valid_samples: # valid dataset size
 
 test:
@@ -36,7 +35,7 @@ test:
   nonhq:   # path to non hq MusDB for evaluation
 
 epochs: 360
-batch_size: 64
+batch_size: 32
 max_batches:  # limit the number of batches per epoch, useful for debugging
               # or if your dataset is gigantic.
 optim:
@@ -53,7 +52,7 @@ debug: false
 valid_apply: true
 flag:
 save_every:
-weights: [1., 1., 1., 1.]  # weights over each source for the training/valid loss.
+weights: [1., 1.]  # weights over each source for the training/valid loss.
 
 augment:
   shift_same: false
@@ -77,7 +76,7 @@ continue_opt: false
 
 misc:
   num_workers: 10
-  num_prints: 4
+  num_prints: 10
   show: false
   verbose: false
 
